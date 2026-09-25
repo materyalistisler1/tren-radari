@@ -279,6 +279,7 @@ body.uzman .basitOzel{display:none!important}
     <div class="rehber-adim"><div class="no">2</div><div>BotFather sana uzun bir <b>token</b> verir (123456:ABC... gibi). Onu kopyala, aşağıya yapıştır ve Kaydet'e bas. Token bu bilgisayarda saklanır, kimseyle paylaşma.</div></div>
     <div class="rehber-adim"><div class="no">3</div><div>BotFather'ın verdiği linkten <b>kendi botunu aç</b> ve <b>Başlat (Start)</b> düğmesine bas.</div></div>
     <div class="rehber-adim"><div class="no">4</div><div>Buradaki <b>Bağlan</b> düğmesine bas, sonra <b>Test mesajı</b> gönder. Telefonuna mesaj gelirse tamamdır ✅</div></div>
+    <div class="rehber-adim"><div class="no">5</div><div><b>Eşin ve kardeşin de alsın:</b> botunun linkini onlara gönder (t.me/botunun_adi). Onlar da açıp <b>Başlat</b>'a bassın, sonra sen burada tekrar <b>Bağlan</b>'a bas. Listeye eklenirler, mesajlar hepinize gider.</div></div>
     <div class="form"><label>Bot token<input id="tgToken" type="password" placeholder="123456:ABC..." size="34" autocomplete="off"></label><button id="tgKaydet">Kaydet</button><button id="tgBaglan" class="ana">Bağlan</button><button id="tgTest">Test mesajı</button></div>
     <div id="tgDurum" class="kucuk soluk"></div>
     <div class="sesSatir"><label><input type="checkbox" id="tgAcik"> Telegram bildirimleri açık</label></div>
@@ -567,21 +568,24 @@ function sesAyarKaydet(){sesAyar={vol:+$('sesSeviye').value,tip:$('sesTip').valu
 for(const id of ['sesSeviye','sesTip','uzunFiyat','uzunRoket','uzunPoz'])$(id).addEventListener('input',sesAyarKaydet);
 // ---------- Telegram: telefona bildirim ----------
 let tg=lsGet('tr2_tg',{token:'',chat:null,acik:true,tur:{roket:1,rampa:1,gir:1,alarm:1,poz:1,haber:1,takip:0}});
+if(!tg.chatler)tg.chatler=tg.chat?[{id:tg.chat,ad:'Sen'}]:[];
 const tgKuyruk=[];let tgMesgul=false;
 function tgKaydetAyar(){lsSet('tr2_tg',tg);tgAyarCiz();}
 function tgAyarCiz(){$('tgToken').value=tg.token||'';$('tgAcik').checked=!!tg.acik;document.querySelectorAll('[data-tg]').forEach(c=>c.checked=!!tg.tur[c.dataset.tg]);
- $('tgDurum').innerHTML=!tg.token?'Henüz token girilmedi.':!tg.chat?'Token kayıtlı. Şimdi botunu Telegram\'da açıp Başlat\'a bas, sonra buradan Bağlan\'a bas.':`✅ Bağlı (sohbet no ${tg.chat}). Bildirimler ${tg.acik?'açık':'kapalı'}.`;}
+ $('tgDurum').innerHTML=!tg.token?'Henüz token girilmedi.':!tg.chatler.length?'Token kayıtlı. Şimdi botunu Telegram\'da açıp Başlat\'a bas, sonra buradan Bağlan\'a bas.':`✅ Bağlı. Bildirimler ${tg.acik?'açık':'kapalı'}. Mesaj gidenler: ${tg.chatler.map((c,i)=>`<b>${esc(c.ad)}</b> <button class="kucukb" onclick="tgCikar(${i})">✕</button>`).join(' · ')}`;}
+function tgCikar(i){tg.chatler.splice(i,1);tgKaydetAyar();}
 function tgTur(m,tur){return m.includes('ROKET')?'roket':m.includes('RAMPA')?'rampa':m.includes('ALARM')?'alarm':m.includes('HABER')?'haber':(m.includes('İLERLEDİ')||m.includes('roket yolunda')||m.includes('sinyalden'))?'takip':m.includes('YENİ GİR')?'gir':(m.includes('UYARI')||tur==='uyari')?'poz':null}
-function tgHaber(m,tur){if(!tg.acik||!tg.token||!tg.chat)return;const t=tgTur(m,tur);if(!t||!tg.tur[t])return;tgGonder('🚂 Tren Radarı\n'+m);}
+function tgHaber(m,tur){if(!tg.acik||!tg.token||!tg.chatler.length)return;const t=tgTur(m,tur);if(!t||!tg.tur[t])return;tgGonder('🚂 Tren Radarı\n'+m);}
 function tgGonder(text){tgKuyruk.push(text);if(!tgMesgul)tgIsle();}
-async function tgIsle(){tgMesgul=true;while(tgKuyruk.length){const t=tgKuyruk.shift();try{const r=await fetch(`https://api.telegram.org/bot${tg.token}/sendMessage?chat_id=${encodeURIComponent(tg.chat)}&disable_web_page_preview=true&text=${encodeURIComponent(t)}`);if(r.status===429)await new Promise(z=>setTimeout(z,5000));}catch(e){}await new Promise(z=>setTimeout(z,1200));}tgMesgul=false;}
-$('tgKaydet').onclick=()=>{const v=$('tgToken').value.trim();if(v!==tg.token){tg.token=v;tg.chat=null;}tgKaydetAyar();};
+async function tgIsle(){tgMesgul=true;while(tgKuyruk.length){const t=tgKuyruk.shift();for(const c of tg.chatler){try{const r=await fetch(`https://api.telegram.org/bot${tg.token}/sendMessage?chat_id=${encodeURIComponent(c.id)}&disable_web_page_preview=true&text=${encodeURIComponent(t)}`);if(r.status===429)await new Promise(z=>setTimeout(z,5000));}catch(e){}await new Promise(z=>setTimeout(z,400));}await new Promise(z=>setTimeout(z,1000));}tgMesgul=false;}
+$('tgKaydet').onclick=()=>{const v=$('tgToken').value.trim();if(v!==tg.token){tg.token=v;tg.chat=null;tg.chatler=[];}tgKaydetAyar();};
 $('tgBaglan').onclick=async()=>{const v=$('tgToken').value.trim();if(v)tg.token=v;if(!tg.token){$('tgDurum').textContent='Önce token yapıştır.';return}$('tgDurum').textContent='Bağlanıyor…';
  try{const me=await fetch(`https://api.telegram.org/bot${tg.token}/getMe`).then(r=>r.json());if(!me.ok){$('tgDurum').textContent='Token hatalı görünüyor. BotFather\'ın verdiği token\'ı tam kopyaladığından emin ol.';return}
-  const up=await fetch(`https://api.telegram.org/bot${tg.token}/getUpdates`).then(r=>r.json());const msj=(up.result||[]).map(u=>u.message||u.my_chat_member||u.edited_message).filter(Boolean);const son=msj[msj.length-1];
-  if(!son){$('tgDurum').textContent=`Bot bulundu (@${me.result.username}) ama sana ait mesaj yok. Telegram'da botunu açıp Başlat'a bas, sonra tekrar Bağlan'a bas.`;return}
-  tg.chat=son.chat.id;tg.acik=true;tgKaydetAyar();tgGonder('✅ Tren Radarı bağlandı! Önemli sinyaller buraya gelecek.');}catch(e){$('tgDurum').textContent='Bağlanamadı: internet bağlantını kontrol et.'}};
-$('tgTest').onclick=()=>{if(!tg.chat){$('tgDurum').textContent='Önce Bağlan\'a bas.';return}tgGonder('🔔 Test mesajı: Tren Radarı çalışıyor. '+new Date().toLocaleTimeString('tr-TR'));$('tgDurum').textContent='Test mesajı gönderildi, telefonuna bak.';};
+  const up=await fetch(`https://api.telegram.org/bot${tg.token}/getUpdates`).then(r=>r.json());const msj=(up.result||[]).map(u=>u.message||u.my_chat_member||u.edited_message).filter(Boolean);let yeni=0;
+  for(const m of msj){const c=m.chat;if(!c||tg.chatler.some(x=>String(x.id)===String(c.id)))continue;tg.chatler.push({id:c.id,ad:c.title||[c.first_name,c.last_name].filter(Boolean).join(' ')||c.username||'Kişi'});yeni++;}
+  if(!tg.chatler.length){$('tgDurum').textContent=`Bot bulundu (@${me.result.username}) ama sana ait mesaj yok. Telegram'da botunu açıp Başlat'a bas, sonra tekrar Bağlan'a bas.`;return}
+  tg.acik=true;tgKaydetAyar();if(yeni)tgGonder('✅ Tren Radarı bağlandı! Önemli sinyaller buraya gelecek.');else $('tgDurum').innerHTML+=' <span class="soluk">(yeni kişi yok: eklemek istediğin kişi botu açıp Başlat\'a bassın, sonra tekrar Bağlan)</span>';}catch(e){$('tgDurum').textContent='Bağlanamadı: internet bağlantını kontrol et.'}};
+$('tgTest').onclick=()=>{if(!tg.chatler.length){$('tgDurum').textContent='Önce Bağlan\'a bas.';return}tgGonder('🔔 Test mesajı: Tren Radarı çalışıyor. '+new Date().toLocaleTimeString('tr-TR'));$('tgDurum').textContent='Test mesajı gönderildi, telefonuna bak.';};
 $('tgAcik').onchange=()=>{tg.acik=$('tgAcik').checked;tgKaydetAyar();};
 document.querySelectorAll('[data-tg]').forEach(c=>c.onchange=()=>{tg.tur[c.dataset.tg]=c.checked?1:0;tgKaydetAyar();});
 tgAyarCiz();
