@@ -657,8 +657,8 @@ async function tara(){if(st.taraCalisiyor)return;st.taraCalisiyor=true;$('durum'
  try{
   if(!st.perps){const info=await j(F+'/fapi/v1/exchangeInfo');st.perps=new Set(info.symbols.filter(s=>s.contractType==='PERPETUAL'&&s.quoteAsset==='USDT'&&s.status==='TRADING'&&(!s.underlyingType||s.underlyingType==='COIN')).map(s=>s.symbol));
    $('coinler').innerHTML=[...st.perps].map(s=>`<option value="${taban(s).base}">`).join('');}
-  const [tick,prem,spot]=await Promise.all([j(F+'/fapi/v1/ticker/24hr'),j(F+'/fapi/v1/premiumIndex'),j(S+'/api/v3/ticker/price')]);
-  st.spotUSDT=new Set();for(const p of spot){if(p.symbol.endsWith('TRY'))st.tryMap[p.symbol]=+p.price;else if(p.symbol.endsWith('USDT'))st.spotUSDT.add(p.symbol)}st.usdttry=st.tryMap['USDTTRY']||st.usdttry;$('kur').textContent='USDT/TRY: '+(st.usdttry?st.usdttry.toFixed(2):'-');
+  const [tick,prem,spot]=await Promise.all([j(F+'/fapi/v1/ticker/24hr'),j(F+'/fapi/v1/premiumIndex'),j(S+'/api/v3/ticker/24hr?type=MINI')]);
+  st.spotUSDT=new Set();st.tryMap={};const taze=Date.now()-6*3600000;for(const p of spot){if(!(+p.closeTime>taze)||!(+p.lastPrice>0))continue;if(p.symbol.endsWith('TRY'))st.tryMap[p.symbol]=+p.lastPrice;else if(p.symbol.endsWith('USDT'))st.spotUSDT.add(p.symbol)}st.usdttry=st.tryMap['USDTTRY']||st.usdttry;$('kur').textContent='USDT/TRY: '+(st.usdttry?st.usdttry.toFixed(2):'-');
   const fon={},mark={};for(const p of prem){fon[p.symbol]=+p.lastFundingRate;mark[p.symbol]=+p.markPrice}
   for(const t of tick)st.fut[t.symbol]={fiyat:+t.lastPrice,ch24:+t.priceChangePercent/100,hacim:+t.quoteVolume,fund:fon[t.symbol]};
   hava();
@@ -730,7 +730,7 @@ function roketKart(t){const b=taban(t.sym).base,x=t.ign,E=t.fiyat;const hb=coinH
  ${hb.length?`<div class="kucuk">📰 <a href="https://www.binance.com/en/support/announcement/detail/${hb[0].code}" target="_blank" rel="noopener">${esc(hb[0].title)}</a></div>`:''}
  <div class="bas"><span>${fp(E)} $ <span class="soluk">· ${tlFmt(tl(t.sym,E))}</span></span><span><button class="kucukb ana" onclick="sanalGir('${t.sym}')">🧪 Sanal gir</button> <button class="kucukb" onclick="detayAc('${t.sym}')">Detay</button> <button class="kucukb" onclick="alarmHazirla('${t.sym}')">Alarm</button> <button class="kucukb" onclick="grafikAc('${t.sym}')">📈</button></span></div>
  <div class="kucuk">Kalkış mumu: <b>${saat(x.zaman)}–${saat(x.zaman+3600000)}</b> ${x.canli?'(şu an sürüyor)':'(kapandı)'} · <b>${yuzde(x.r1)}</b> · kalkıştan önce ${fp(x.once)} $</div>${sinyalSaati(t)}
- ${kilitKutu(b,t.arz,false)}<div style="margin-top:6px">${kont}</div>
+ ${kilitKutu(b,t.arz,false)}${durumYorum(t)}<div style="margin-top:6px">${kont}</div>
  <div class="plan"><b>Roket planı</b> · testte bu adayların %35'i +%25 ve üstüne gitti, ama çoğu küçük zararla bitti<br>
   🛑 Stop ${fp(E*0.85)} $ <span class="soluk">(${tlFmt(tl(t.sym,E*0.85))}, −%15)</span><br>
   ✅ +%20'ye (${tlFmt(tl(t.sym,E*1.2))}) gelince stop'u girişe çek<br>
@@ -751,6 +751,23 @@ function heroCiz(){const s=st.sonuc||[];const r=s.filter(x=>x.sinif==='ROKET').l
  $('hero').innerHTML=`<div class="hero ${c}"><div class="hero-ikon">${ik}</div><div><div class="hero-bas">${bas}</div><div class="hero-alt">${alt}</div><div class="hero-mini">${st.hava?st.hava+' Bitcoin havası · ':''}${(st.rampa||[]).length} coin rampada · ${pozlar.length} pozisyon · ${sanal.acik.length} sanal işlem · ${Object.keys(takip).length} coin takipte</div></div></div>`;}
 const DONGU=[['🔭','Radar bulur','firsat'],['🔍','Kontrol et','detay'],['🧮','Kaç adet?','hesap'],['✅','Gir','sanal'],['⏰','Alarm kur','alarm'],['📈','Takip et','takip'],['📊','Karne','karne']];
 function donguCiz(){$('dongu').innerHTML=DONGU.map((d,i)=>`<button class="adim" onclick="git('${d[2]}')" title="${d[1]}"><span class="adim-no">${i+1}. ADIM</span><span class="adim-ikon">${d[0]}</span><span class="adim-ad">${d[1]}</span></button>`).join('<span class="ok">›</span>');}
+st.oran={};
+function durumYorum(t){const o=st.oran[t.sym]||{};const wh=t.wh??o.wh,wh24=t.wh24??o.wh24,rt=t.rt??o.rt;const b=taban(t.sym).base;const L=[];let kotu=0,iyi=0;
+ const whd=wh&&wh24?wh/wh24-1:null;
+ if(whd!=null&&whd<=-0.1){L.push(`Balinalar azaltıyor (${wh24.toFixed(2)} → ${wh.toFixed(2)})`);kotu++}else if(whd!=null&&whd>=0.1){L.push(`Balinalar dolduruyor (${wh24.toFixed(2)} → ${wh.toFixed(2)})`);iyi++}else if(wh)L.push(`Balinalar yerinde (${wh.toFixed(2)})`);
+ if(rt!=null&&rt>=2){L.push(`Kalabalık long'a doldu (küçük yatırımcı ${rt.toFixed(2)})`);kotu++}else if(rt!=null&&rt<1){L.push(`Kalabalık short (${rt.toFixed(2)}): sıkışma yakıtı`);iyi++}
+ const bugun=Math.floor(Date.now()/864e5)*864e5;let th=0;for(const k of t.k170||[])if(+k[0]>=bugun)th=Math.max(th,+k[2]);const fit=th?t.fiyat/th-1:0;
+ if(fit<=-0.15){L.push(`Gün içi tepeden ${yuzde(fit,0)} geri düştü (üst fitil)`);kotu+=2}
+ if(t.oi1!=null&&t.oi1<=-0.08){L.push(`Son 1 saatte kaldıraç kaçıyor (OI ${yuzde(t.oi1,0)})`);kotu++}
+ if(t.fund>=0.0003){L.push(`Funding yükseliyor (%${(t.fund*100).toFixed(3)}): kalabalık pahalı`);kotu++}
+ const pazar=st.tryMap[b+'TRY']!=null?'✅ Binance TR\'de TL çifti var':(st.spotUSDT&&st.spotUSDT.has(b+'USDT'))?'Spot USDT çifti var (TL çifti yok)':'⚠️ Sadece vadelide, Binance TR\'de alınamaz';
+ const kalabalikCikis=whd!=null&&whd<=-0.1&&rt!=null&&rt>=2;
+ const sev=kotu>=2||kalabalikCikis?'k':kotu===1?'s':'y';
+ const baslik=kalabalikCikis?'🔴 Kalabalık geldi, balina çıkıyor: dikkat':sev==='k'?'🔴 Dikkat: hareket yorulmuş olabilir':sev==='s'?'🟡 Karışık sinyal':'🟢 Tablo sağlıklı';
+ return `<div class="kb-not" style="background:${sev==='k'?'var(--kirmiziA)':sev==='s'?'var(--sariA)':'var(--yesilA)'}"><b>${baslik}</b>${L.length?'<br>'+L.join(' · '):''}<br><span class="kucuk">${pazar}</span></div>`;}
+async function oranTamamla(syms){const eksik=syms.filter(s=>!st.oran[s]||Date.now()-st.oran[s].t>55*60000).slice(0,25);if(!eksik.length)return;
+ await havuz(eksik,3,async s=>{const [w,r]=await Promise.all([oranGecmis('topLongShortPositionRatio',s),oranGecmis('globalLongShortAccountRatio',s)]);st.oran[s]={t:Date.now(),wh:w.now,wh24:w.o24,rt:r.now};});
+ if(st.sekme==='rampa')rampaCiz();}
 function kartBasit(t){const b=taban(t.sym).base,roket=t.sinif==='ROKET';const ilk=st.ilk[t.sym];const yeni=ilk&&ilk.t!==st.ilkTarama&&Date.now()-ilk.t<20*60000;
  let isik,tiles,alt,not;
  if(roket){const x=t.ign;isik=t.roketKontrol.map(k=>isikDot(k[1],KISA[k[0]]||k[0])).join('');
@@ -764,7 +781,7 @@ function kartBasit(t){const b=taban(t.sym).base,roket=t.sinif==='ROKET';const il
  const hb=coinHaber(b);const p0=roket?null:planYap(t.fiyat,t.g.atr);
  return `<div class="kartB ${roket?'roket':''} ${yeni?'pulse':''}"><div class="kb-ust"><div><div class="kb-ad">${roket?'🚀':'🟢'} ${b}</div><div class="kb-alt">${alt}</div></div><div class="kb-fiyat">${tlFmt(tl(t.sym,t.fiyat))}<small>bugün ${yuzde(t.ch24)}</small></div></div>
   ${hb.length?`<div class="kb-not" style="background:var(--maviA)">📰 <a href="https://www.binance.com/en/support/announcement/detail/${hb[0].code}" target="_blank" rel="noopener">${esc(hb[0].title)}</a></div>`:''}
-  ${kilitKutu(b,t.arz)}<div class="kb-isik">${isik}</div><div class="tiles">${tiles}</div><div class="kb-not">${not}</div>
+  ${kilitKutu(b,t.arz)}${durumYorum(t)}<div class="kb-isik">${isik}</div><div class="tiles">${tiles}</div><div class="kb-not">${not}</div>
   <div class="kb-btn"><button class="ana" onclick="sanalGir('${t.sym}')">🧪 Sanal gir</button><button onclick="detayAc('${t.sym}')">🔍 İncele</button>${roket?`<button onclick="hesapAc('${t.sym}',${t.fiyat},${t.fiyat*0.85})">🧮 Kaç adet?</button>`:`<button onclick="hesapAc('${t.sym}',${p0.giris},${p0.stop})">🧮 Kaç adet?</button>`}<button onclick="alarmHazirla('${t.sym}')">⏰ Alarm</button>${grafikBtn(t.sym)}</div></div>`;}
 function ciz(){heroCiz();const s=st.sonuc;if(!s.length){$('liste').innerHTML=st.sonTarama?'<div class="bos">Şu an kriterlere uyan coin yok. Piyasa sakin.</div>':'<div class="bos">⏳ İlk tarama yapılıyor, yaklaşık 30-60 saniye sürer…</div>';return}
  const gr={ROKET:[],GIR:[],IZLE:[],HAZIR:[],KACTI:[],GEC:[]};for(const t of s)gr[t.sinif].push(t);
@@ -790,9 +807,9 @@ function ciz(){heroCiz();const s=st.sonuc;if(!s.length){$('liste').innerHTML=st.
 async function derin(sym){const [tk,pr,oi,w,r,k,tk5]=await Promise.all([j(F+`/fapi/v1/ticker/24hr?symbol=${sym}`),j(F+`/fapi/v1/premiumIndex?symbol=${sym}`),oiGecmis(sym),oranGecmis('topLongShortPositionRatio',sym),oranGecmis('globalLongShortAccountRatio',sym),j(F+`/fapi/v1/klines?symbol=${sym}&interval=1h&limit=60`),j(F+`/futures/data/takerlongshortRatio?symbol=${sym}&period=5m&limit=48`)]);
  const fiyat=+tk.lastPrice;st.fut[sym]=Object.assign(st.fut[sym]||{},{fiyat,ch24:+tk.priceChangePercent/100,fund:+pr.lastFundingRate});
  tk5.sort((a,b)=>a.timestamp-b.timestamp);const akis=n=>{let s=0;for(const x of tk5.slice(-n))s+=(+x.buyVol-+x.sellVol)*fiyat;return s};
- const {base}=taban(sym);try{const p=await j(S+`/api/v3/ticker/price?symbol=${base}TRY`);st.tryMap[base+'TRY']=+p.price}catch(e){}
+ const {base}=taban(sym);try{const p=await j(S+`/api/v3/ticker/24hr?type=MINI&symbol=${base}TRY`);if(+p.closeTime>Date.now()-6*3600000&&+p.lastPrice>0)st.tryMap[base+'TRY']=+p.lastPrice;else delete st.tryMap[base+'TRY'];}catch(e){delete st.tryMap[base+'TRY']}
  return {sym,fiyat,ch24:+tk.priceChangePercent/100,fund:+pr.lastFundingRate,oi,w,r,g:gosterge(k),akis:{m5:akis(1),m15:akis(3),m30:akis(6),h1:akis(12),h4:akis(48)},lik:likOzet(sym)};}
-function grafikAc(sym){const b=taban(sym).base;const tv=st.tryMap[b+'TRY']!=null?`BINANCE:${b}TRY`:(st.spotUSDT&&st.spotUSDT.has(b+'USDT'))?`BINANCE:${b}USDT`:`BINANCE:${sym}.P`;window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent(tv),'_blank','noopener');}
+function grafikAc(sym){const b=taban(sym).base;if(/[^\x00-\x7F]/.test(sym)){window.open('https://www.binance.com/tr/futures/'+encodeURIComponent(sym),'_blank','noopener');return}const tv=st.tryMap[b+'TRY']!=null?`BINANCE:${b}TRY`:(st.spotUSDT&&st.spotUSDT.has(b+'USDT'))?`BINANCE:${b}USDT`:`BINANCE:${sym}.P`;window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent(tv),'_blank','noopener');}
 const grafikBtn=sym=>`<button onclick="grafikAc('${sym}')" title="TradingView'de aç (TL çifti varsa TRY, yoksa spot USDT, o da yoksa vadeli .P)">📈 Grafik</button>`;
 function isik(ok,orta){return ok?'🟢':orta?'🟡':'🔴'}
 async function detayAc(sym){git('detay');st.detaySym=sym;$('dCoin').value=taban(sym).base;await detayCiz();}
@@ -1064,17 +1081,18 @@ function rampaGuncelle(aday){st.sonAday=aday;if(!Object.keys(st.gunlukC).length)
  for(const t of aday){const r=rampaHesap(t);if(!r)continue;if(!r.tabanda&&!(r.kirilim&&r.dus<=-0.7&&r.tabanGun>0))continue;
   const lamba=[['Uzun taban (60+ gündür dar bantta)',r.tabanGun>=60,'testte en kaliteli kırılımlar'],['Dar taban (60 günde aralık %50 ya da dar)',r.rng<=0.5,'daha az sahte kırılım'],['Roket karakteri (son yıllarda bir ayda +%100 yapmış)',r.eskiRoket,'olanlar 2 kat daha sık uçtu'],['Kaldıraç toplanıyor (3 günde OI +%30)',t.pre72!=null&&t.pre72>=0.3,'saatlik testte güçlü'],['Kalabalık short (küçük yatırımcı 1\'in altında)',t.rt!=null&&t.rt<1,'hafif olumlu'],['KIRILIM: 60 günlük tavan kırıldı',r.kirilim,'tetik'],['Kırılımda hacim 3 kat',r.kirilim&&r.hacim3,'testte güçlü'],['Güçlü kırılım mumu (bugün +%15)',r.kirilim&&r.gucluMum,'testte olumlu']];
   const uyar=[];if(r.vx7>=2)uyar.push('⚠️ Kırılımdan önce hacim zaten şişmiş (7 gün 2 kat): testte bu durumda kırılımlar daha sık söndü');
-  L.push({sym:t.sym,fiyat:t.fiyat,ch24:t.ch24,r,lamba,uyar,sayi:lamba.filter(x=>x[1]).length,arz:t.arz});
+  L.push({sym:t.sym,fiyat:t.fiyat,ch24:t.ch24,r,lamba,uyar,sayi:lamba.filter(x=>x[1]).length,arz:t.arz,t});
   if(r.kirilim&&(r.hacim3||r.gucluMum)){const gun=new Date().toDateString();if(st.rampaBildi[t.sym]!==gun){st.rampaBildi[t.sym]=gun;lsSet('tr2_rampaBildi',st.rampaBildi);
    const b=taban(t.sym).base;const msg=`${b} · 60 günlük tavan (${tlFmt(tl(t.sym,r.hi60))}) kırıldı · bugünkü hacim ${r.bugunVx.toFixed(1)} kat · şimdi ${tlFmt(tl(t.sym,t.fiyat))}`;
    haber('🛫 RAMPADAN KALKIŞ: '+msg);if(sesAyar.uzunRoket)alarmCal('RAMPADAN KALKIŞ',msg,true,'🛫');else bip(1250,4);}}}
- st.rampa=L;if(st.sekme==='rampa')rampaCiz();heroCiz();}
+ st.rampa=L;if(st.sekme==='rampa')rampaCiz();heroCiz();
+ oranTamamla([...L].sort((a,b)=>(b.r.kirilim-a.r.kirilim)||(b.sayi-a.sayi)).slice(0,25).map(x=>x.sym)).catch(()=>{});}
 function rampaCiz(){const L=[...st.rampa];if(!L.length){$('rampaListe').innerHTML=`<div class="bos">${Object.keys(st.gunlukC).length>300?'Şu an rampada coin yok.':'Günlük grafikler arka planda yükleniyor, birkaç dakika içinde liste dolacak.'}</div>`;return}
  const sr=$('rampaSira').value;L.sort((a,b)=>sr==='konum'?b.r.konum-a.r.konum:sr==='dus'?a.r.dus-b.r.dus:(b.sayi-a.sayi)||(b.r.konum-a.r.konum));
  const kir=L.filter(x=>x.r.kirilim);
  const kart=x=>{const b=taban(x.sym).base,r=x.r;const hTL=tl(x.sym,r.hi60),fTL=tl(x.sym,x.fiyat);const uzak=r.hi60/x.fiyat-1;
   return `<div class="kartB ${r.kirilim?'roket pulse':''}" style="${r.kirilim?'':'border-top-color:var(--mavi)'}"><div class="kb-ust"><div><div class="kb-ad">${r.kirilim?'🛫':'🅿️'} ${b}</div><div class="kb-alt">Zirveden <b>${yuzde(r.dus,0)}</b> · 60 gündür %${(r.rng*100).toFixed(0)}'lik bantta · <b>${x.sayi}/8 lamba</b></div></div><div class="kb-fiyat">${tlFmt(fTL)}<small>bugün ${yuzde(x.ch24)}</small></div></div>
-   ${kilitKutu(b,x.arz,false)}${x.uyar.map(u=>`<div class="kb-not">${u}</div>`).join('')}<div class="kb-alt" style="margin-top:8px">${r.tabanGun} gündür tabanda</div><div class="kb-isik">${x.lamba.map(l=>isikDot(l[1],l[0].split(' (')[0])).join('')}</div>
+   ${kilitKutu(b,x.arz,false)}${durumYorum(x.t)}${x.uyar.map(u=>`<div class="kb-not">${u}</div>`).join('')}<div class="kb-alt" style="margin-top:8px">${r.tabanGun} gündür tabanda</div><div class="kb-isik">${x.lamba.map(l=>isikDot(l[1],l[0].split(' (')[0])).join('')}</div>
    <div class="tiles">${tile('stop','BANT DİBİ',tlFmt(tl(x.sym,r.lo60)))}${tile('gir','ŞU AN',tlFmt(fTL))}${tile('hedef','KIRILIM SEVİYESİ',tlFmt(hTL),r.kirilim?'KIRILDI!':yuzde(uzak)+' yukarıda')}</div>
    ${r.kirilim?`<div class="kb-not"><b>Kırıldı!</b> Dikkat: tabandan kırılımların çoğu geri döner (30 gün sonra orta değer −%11). Kazanç az sayıdaki büyük roketten gelir. <b>Küçük gir</b>, stop −%15, +%20'den sonra zirveden −%25 takip eden stop. Kırılım seviyesine geri test normaldir, hemen kaçma.</div>`:''}
    <details style="margin-top:8px"><summary class="kucuk soluk">Lambaların açıklaması</summary><div class="kucuk">${x.lamba.map(l=>`${l[1]?'✔':'✖'} ${l[0]}${l[2]?` <span class="soluk">(${l[2]})</span>`:''}`).join('<br>')}</div></details>
