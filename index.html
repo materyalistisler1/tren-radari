@@ -536,7 +536,7 @@ const EX=new Set(['BTCUSDT','ETHUSDT','USDCUSDT','BTCDOMUSDT','DEFIUSDT','FDUSDU
 const st={perps:null,fut:{},tryMap:{},usdttry:null,sonuc:[],ilk:{},oncekiSinif:{},liq:{},ses:true,sayac:0,taraCalisiyor:false,detaySym:null,pozUyari:{},sekme:'firsat'};
 const $=id=>document.getElementById(id);
 // Binance hiz siniri (429/418) gelirse 60 sn bekle
-async function j(u){if(st.bekle&&Date.now()<st.bekle)throw new Error('bekle');const r=await fetch(u);if(r.status===429||r.status===418){st.bekle=Date.now()+60000;st.sinirUyari=true;throw new Error(r.status)}if(!r.ok)throw new Error(r.status);return r.json();}
+async function j(u){if(st.bekle&&Date.now()<st.bekle)throw new Error('bekle');if(st.spotYedek&&u.startsWith(S))u=u.replace(S,'https://data-api.binance.vision');let r;try{r=await fetch(u)}catch(e){if(u.startsWith(S)&&!st.spotYedek){st.spotYedek=true;return j(u)}throw e}if(r.status===429||r.status===418){st.bekle=Date.now()+60000;st.sinirUyari=true;throw new Error(r.status)}if(!r.ok)throw new Error(r.status);return r.json();}
 async function havuz(items,n,fn){let i=0;const w=Array.from({length:n},async()=>{while(i<items.length){const k=i++;try{await fn(items[k])}catch(e){}}});await Promise.all(w);}
 const yuzde=(x,d=1)=>x==null||isNaN(x)?'-':(x>=0?'+':'')+(x*100).toFixed(d)+'%';
 function fp(x){if(x==null||isNaN(x))return '-';const a=Math.abs(x);return a>=1000?x.toFixed(1):a>=100?x.toFixed(2):a>=1?x.toFixed(3):a>=0.01?x.toFixed(4):x.toPrecision(4);}
@@ -684,13 +684,14 @@ async function tara(){if(st.taraCalisiyor)return;st.taraCalisiyor=true;$('durum'
     if(t.sinif==='ROKET'){karneKaydet(t,'ROKET');if(st.oncekiSinif[t.sym]!=='ROKET'&&st.sayac>0){const msg=`${taban(t.sym).base} · kalkış ${yuzde(t.ign.r1)} · puan ${t.roketPuan}/7 · ${tlFmt(tl(t.sym,t.fiyat))}`;haber('🚀 ROKET ADAYI: '+msg);if(sesAyar.uzunRoket)alarmCal('ROKET ADAYI',msg,true,'🚀');else bip(1320,4);}}
     if(t.sinif==='GIR'){karneKaydet(t);if(st.oncekiSinif[t.sym]!=='GIR'&&st.sayac>0){haber(`YENİ GİR: ${taban(t.sym).base} · OI 24s ${yuzde(t.oi24)} · fiyat ${yuzde(t.ch24)}`);bip(988,3);}}}
   st.oncekiSinif={};for(const t of sonuc)st.oncekiSinif[t.sym]=t.sinif;
+  {const d=$('baglantiUyari');if(d)d.remove();}
   st.sonuc=sonuc;st.sayac++;st.sonTarama=simdi;ciz();haberBantCiz();try{takipGuncelle(aday,sonuc)}catch(e){}
   try{rampaGuncelle(aday)}catch(e){}
   st.arz=st.arz||{};for(const t of aday)if(t.arz)st.arz[t.sym]=t.arz;
   kilitTazele([...new Set([...sonuc.filter(t=>['ROKET','GIR','IZLE'].includes(t.sinif)).map(t=>taban(t.sym).base),...pozlar.map(p=>p.coin.toUpperCase()),...sanal.acik.map(x=>x.coin)])]).then(()=>ciz()).catch(()=>{});
   $('durum').textContent=`✅ ${new Date(simdi).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})} · ${aday.length}/${st.perps.size} coin tarandı`+(st.sinirUyari?' · ⚠️ hız sınırı, bir kısmı atlandı':'');st.sinirUyari=false;$('durum').title='Binance vadelideki tüm coinlerden, günlük hacmi 1 milyon $ üstü olanlar ve 24 saatte −%6 ile +%40 arasında olanlar taranır';
   karneGuncelle();
- }catch(e){$('durum').textContent='⚠️ Hata: '+e.message+' (1 dk sonra tekrar)';setTimeout(tara,60000);}
+ }catch(e){$('durum').textContent='⚠️ Bağlantı sorunu (1 dk sonra tekrar deneyecek)';baglantiTesti();setTimeout(tara,60000);}
  st.taraCalisiyor=false;}
 
 function kart(t,odak){const b=taban(t.sym).base,g=t.g,p=planYap(t.fiyat,g.atr);
@@ -1017,6 +1018,16 @@ function sanalCiz(){$('sTutar').value=sanal.tutar;const K=sanal.kapali;const net
  $('sKapali').innerHTML=K.length?`<h2>Kapanan sanal işlemler</h2><div class="kart"><table><tr><th>Giriş zamanı</th><th>Coin</th><th>Sinyal</th><th class="r">Giriş</th><th class="r">Çıkış (ort.)</th><th class="r">Süre</th><th class="r">K/Z</th></tr>${[...K].reverse().map(x=>`<tr><td class="kucuk">${new Date(x.t).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td><td>${esc(x.coin)}</td><td class="kucuk">${ad[x.sinif]||x.sinif}</td><td class="r">${tlFmt(x.giris)}</td><td class="r">${tlFmt(x.cikis)}</td><td class="r kucuk">${Math.round((x.kapanis-x.t)/60000)} dk</td><td class="r ${x.kz>=0?'y':'k'}">${x.kz>=0?'+':''}${tlFmt(x.kz)} (${yuzde(x.kz/x.tutar)})</td></tr>`).join('')}</table></div>`:'';}
 $('sTutarKaydet').onclick=()=>{sanal.tutar=+$('sTutar').value||1000;sanalKaydet();$('sTutarKaydet').textContent='Kaydedildi ✓';setTimeout(()=>$('sTutarKaydet').textContent='Kaydet',1500);};
 $('sSifirla').onclick=()=>{if(!confirm('Tüm sanal işlemler silinsin mi?'))return;sanal={tutar:sanal.tutar,acik:[],kapali:[]};sanalKaydet();sanalCiz();};
+
+// ---------- baglanti testi: hangi adres engelli? ----------
+async function baglantiTesti(){const dene=async u=>{try{const r=await fetch(u,{cache:'no-store'});return r.ok}catch(e){return false}};
+ const [fut,spot,yedek]=await Promise.all([dene(F+'/fapi/v1/ping'),dene(S+'/api/v3/ping'),dene('https://data-api.binance.vision/api/v3/ping')]);
+ let m='';if(!fut&&!spot&&!yedek)m='İnternet bağlantısı yok ya da çok zayıf. Bağlantını kontrol et.';
+ else if(!fut)m='<b>Binance vadeli verisine ulaşılamıyor.</b> Büyük ihtimalle mobil operatörün bu adresi engelliyor (ev Wi-Fi\'ında çalışıyorsa sebep bu).<br><b>Çözüm (Android):</b> Ayarlar → Bağlantılar/Ağ → Daha fazla bağlantı ayarı → <b>Özel DNS</b> → "Özel DNS sağlayıcı ana makine adı" → <b>dns.google</b> yaz → Kaydet. Sonra radarı yenile.<br><b>iPhone:</b> App Store\'dan Cloudflare\'in ücretsiz <b>1.1.1.1</b> uygulamasını kurup açman yeterli.';
+ else if(!spot&&!yedek)m='Binance spot fiyatlarına ulaşılamıyor. TL fiyatları eksik olabilir.';
+ if(m){const id='baglantiUyari';let d=$(id);if(!d){d=document.createElement('div');d.id=id;d.className='uyari';$('haberBant').before(d);}d.innerHTML='📡 '+m;}
+ else{const d=$('baglantiUyari');if(d)d.remove();}
+ return {fut,spot,yedek};}
 
 // ---------- tarama zamanlayici ----------
 st.aralik=lsGet('tr2_aralik',5);
